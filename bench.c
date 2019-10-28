@@ -8,11 +8,17 @@
 #include "bench.h"
 #include "msr.h"
 
+#ifndef BENCH_DEBUG
+#define BENCH_DEBUG 0
+#endif
+
 static int bench_rdmsrs(struct msr_handle *h, uint32_t *msrs, uint32_t n_msrs)
 {
     uint64_t data;
     uint32_t m;
+#if BENCH_DEBUG
     uint32_t cpu = msr_get_cpu(h);
+#endif
     ssize_t rc = 0;
     for (m = 0; m < n_msrs; m++) {
         rc = msr_read(h, msrs[m], &data);
@@ -20,8 +26,9 @@ static int bench_rdmsrs(struct msr_handle *h, uint32_t *msrs, uint32_t n_msrs)
             perror("msr_read");
             return -1;
         }
-        // TODO: silent option, but can't let compiler optimize out the read
+#if BENCH_DEBUG
         printf("%"PRIu32": %"PRIu32": 0x%08lx\n", cpu, msrs[m], data);
+#endif
     }
     return 0;
 }
