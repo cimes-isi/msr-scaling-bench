@@ -38,15 +38,16 @@ int bench_serial(const struct bench *ctx)
     uint32_t i;
     uint32_t g;
     uint32_t h;
-    int rc = 0;
     for (i = 0; i < ctx->iters; i++) {
         for (g = 0; g < ctx->n_cpu_groups; g++) {
             for (h = 0; h < ctx->cpu_groups[g].n_handles; h++) {
-                rc = bench_rdmsrs(ctx->cpu_groups[g].handles[h], ctx->msrs, ctx->n_msrs);
+                if (bench_rdmsrs(ctx->cpu_groups[g].handles[h], ctx->msrs, ctx->n_msrs)) {
+                    return -1;
+                }
             }
         }
     }
-    return rc;
+    return 0;
 }
 
 int bench_serial_migrate(const struct bench *ctx)
@@ -55,17 +56,23 @@ int bench_serial_migrate(const struct bench *ctx)
     uint32_t i;
     uint32_t g;
     uint32_t h;
-    int rc = 0;
+    int err = 0;
     for (i = 0; i < ctx->iters; i++) {
         for (g = 0; g < ctx->n_cpu_groups; g++) {
             for (h = 0; h < ctx->cpu_groups[g].n_handles; h++) {
                 affinity_save_and_set(&aff, msr_get_cpu(ctx->cpu_groups[g].handles[h]));
-                rc = bench_rdmsrs(ctx->cpu_groups[g].handles[h], ctx->msrs, ctx->n_msrs);
+                if (bench_rdmsrs(ctx->cpu_groups[g].handles[h], ctx->msrs, ctx->n_msrs)) {
+                    err = errno;
+                }
                 affinity_restore(&aff);
+                if (err) {
+                    errno = err;
+                    return -1;
+                }
             }
         }
     }
-    return rc;
+    return 0;
 }
 
 struct bench_thr_ctx {
