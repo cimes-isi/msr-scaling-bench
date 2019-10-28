@@ -61,9 +61,11 @@ int bench_serial_migrate(const struct bench *ctx)
     return rc;
 }
 
-// TODO: use notifications instead of polling?
 struct bench_thr_ctx {
     pthread_t thr;
+    pthread_mutex_t mtx;
+    pthread_cond_t cond;
+    int is_notif;
     const struct bench *ctx;
     uint32_t cpu_group;
     int go;
@@ -116,13 +118,71 @@ static void *bench_thr_migrate(void *arg)
     return NULL;
 }
 
+static void *bench_thr_notif(void *arg)
+{
+    struct bench_thr_ctx *btc = (struct bench_thr_ctx *)arg;
+    const struct bench *ctx = btc->ctx;
+    struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
+    uint32_t h;
+    pthread_mutex_lock(&btc->mtx);
+    while (!btc->die) {
+        // wait for go-ahead
+        while (!btc->go && !btc->die) {
+            pthread_cond_wait(&btc->cond, &btc->mtx);
+        }
+        if (btc->die) {
+            break;
+        }
+        for (h = 0; h < group->n_handles; h++) {
+            if (bench_rdmsrs(group->handles[h], ctx->msrs, ctx->n_msrs)) {
+                btc->err = errno;
+            }
+        }
+        btc->go = 0;
+    }
+    pthread_mutex_unlock(&btc->mtx);
+    return NULL;
+}
+
+static void *bench_thr_notif_migrate(void *arg)
+{
+    struct bench_thr_ctx *btc = (struct bench_thr_ctx *)arg;
+    const struct bench *ctx = btc->ctx;
+    struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
+    struct affinity aff;
+    uint32_t h;
+    pthread_mutex_lock(&btc->mtx);
+    while (!btc->die) {
+        // wait for go-ahead
+        while (!btc->go && !btc->die) {
+            pthread_cond_wait(&btc->cond, &btc->mtx);
+        }
+        if (btc->die) {
+            break;
+        }
+        for (h = 0; h < group->n_handles; h++) {
+            affinity_save_and_set(&aff, msr_get_cpu(group->handles[h]));
+            if (bench_rdmsrs(group->handles[h], ctx->msrs, ctx->n_msrs)) {
+                btc->err = errno;
+            }
+            affinity_restore(&aff);
+        }
+        btc->go = 0;
+    }
+    pthread_mutex_unlock(&btc->mtx);
+    return NULL;
+}
     
 static int bench_thread_create(const struct bench *ctx,
                                void *(*start_routine) (void *),
-                               struct bench_thr_ctx *thr_ctxs)
+                               struct bench_thr_ctx *thr_ctxs,
+                               int is_notif)
 {
     uint32_t i;
     for (i = 0; i < ctx->n_cpu_groups; i++) {
+        pthread_mutex_init(&thr_ctxs[i].mtx, NULL);
+        pthread_cond_init(&thr_ctxs[i].cond, NULL);
+        thr_ctxs[i].is_notif = is_notif;
         thr_ctxs[i].ctx = ctx;
         thr_ctxs[i].cpu_group = i;
         thr_ctxs[i].go = 0;
@@ -145,7 +205,14 @@ static int bench_thread_drive(const struct bench *ctx,
     for (iter = 0; iter < ctx->iters; iter++) {
         // tell threads to start an iteration
         for (i = 0; i < ctx->n_cpu_groups; i++) {
-            thr_ctxs[i].go = 1;
+            if (thr_ctxs[i].is_notif) {
+                pthread_mutex_lock(&thr_ctxs[i].mtx);
+                thr_ctxs[i].go = 1;
+                pthread_cond_signal(&thr_ctxs[i].cond);
+                pthread_mutex_unlock(&thr_ctxs[i].mtx);
+            } else {
+                thr_ctxs[i].go = 1;
+            }
         }
         // wait for all threads to complete an iteration
         for (i = 0; i < ctx->n_cpu_groups; i++) {
@@ -167,7 +234,14 @@ static int bench_thread_join(const struct bench *ctx,
     uint32_t i;
     int err = 0;
     for (i = 0; i < ctx->n_cpu_groups; i++) {
-        thr_ctxs[i].die = 1;
+        if (thr_ctxs[i].is_notif) {
+            pthread_mutex_lock(&thr_ctxs[i].mtx);
+            thr_ctxs[i].die = 1;
+            pthread_cond_signal(&thr_ctxs[i].cond);
+            pthread_mutex_unlock(&thr_ctxs[i].mtx);
+        } else {
+            thr_ctxs[i].die = 1;
+        }
         errno = pthread_join(thr_ctxs[i].thr, NULL);
         if (errno) {
             perror("pthread_join");
@@ -175,13 +249,16 @@ static int bench_thread_join(const struct bench *ctx,
         } else if (thr_ctxs[i].err) {
             err = thr_ctxs[i].err;
         }
+        pthread_cond_destroy(&thr_ctxs[i].cond);
+        pthread_mutex_destroy(&thr_ctxs[i].mtx);
     }
     errno = err;
     return err ? -1 : 0;
 }
 
 static int bench_thread_exec(const struct bench *ctx,
-                             void *(*start_routine) (void *))
+                             void *(*start_routine) (void *),
+                             int is_notif)
 {
     int rc;
     int err;
@@ -191,7 +268,7 @@ static int bench_thread_exec(const struct bench *ctx,
         perror("calloc");
         return -1;
     }
-    rc = bench_thread_create(ctx, start_routine, thr_ctxs);
+    rc = bench_thread_create(ctx, start_routine, thr_ctxs, is_notif);
     if (!rc) {
         rc = bench_thread_drive(ctx, thr_ctxs);
     }
@@ -208,10 +285,20 @@ static int bench_thread_exec(const struct bench *ctx,
 
 int bench_thread(const struct bench *ctx)
 {
-    return bench_thread_exec(ctx, bench_thr);
+    return bench_thread_exec(ctx, bench_thr, 0);
 }
 
 int bench_thread_migrate(const struct bench *ctx)
 {
-    return bench_thread_exec(ctx, bench_thr_migrate);
+    return bench_thread_exec(ctx, bench_thr_migrate, 0);
+}
+
+int bench_thread_notif(const struct bench *ctx)
+{
+    return bench_thread_exec(ctx, bench_thr_notif, 1);
+}
+
+int bench_thread_notif_migrate(const struct bench *ctx)
+{
+    return bench_thread_exec(ctx, bench_thr_notif_migrate, 1);
 }

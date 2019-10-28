@@ -38,4 +38,16 @@ int bench_thread(const struct bench *ctx);
  */
 int bench_thread_migrate(const struct bench *ctx);
 
+/**
+ * Iterate CPU groups in threads without explicit CPU migration (let the kernel migrate).
+ * Use thread notification instead of polling.
+ */
+int bench_thread_notif(const struct bench *ctx);
+
+/**
+ * Iterate CPU groups in threads with explicit CPU migration for each handle.
+ * Use thread notification instead of polling.
+ */
+int bench_thread_notif_migrate(const struct bench *ctx);
+
 #endif // BENCH_H

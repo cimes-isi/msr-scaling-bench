@@ -157,7 +157,9 @@ static void usage(const char *pname, int code)
     fprintf(code ? stderr : stdout,
             "Usage: %s [-b BENCH] [-c CPUS]+ [-i N] [-m N]+ [-h]\n"
             "  -b, --bench=BENCH        Benchmark BENCH, one of:\n"
-            "                           [serial, serial_migrate, thread, thread_migrate]\n"
+            "                           [serial, serial_migrate,\n"
+            "                            thread, thread_migrate,\n"
+            "                            thread_notif, thread_notif_migrate]\n"
             "                           default=serial\n"
             "  -c, --cpu-group=CPUS     Group cpus CPUS together; CPUS: comma-delimited\n"
             "                           If not specified, all cpus are used in one group\n"
@@ -248,13 +250,23 @@ int main(int argc, char **argv)
     }
 
     if (!strncmp(b, "serial", strlen("serial") + 1)) {
+        printf("Benchmark: serial\n");
         rc = bench_serial(&ctx);
     } else if (!strncmp(b, "serial_migrate", strlen("serial_migrate") + 1)) {
+        printf("Benchmark: serial_migrate\n");
         rc = bench_serial_migrate(&ctx);
     } else if (!strncmp(b, "thread", strlen("thread") + 1)) {
+        printf("Benchmark: thread\n");
         rc = bench_thread(&ctx);
     } else if (!strncmp(b, "thread_migrate", strlen("thread_migrate") + 1)) {
+        printf("Benchmark: thread_migrate\n");
         rc = bench_thread_migrate(&ctx);
+    } else if (!strncmp(b, "thread_notif", strlen("thread_notif") + 1)) {
+        printf("Benchmark: thread_notif\n");
+        rc = bench_thread_notif(&ctx);
+    } else if (!strncmp(b, "thread_notif_migrate", strlen("thread_notif_migrate") + 1)) {
+        printf("Benchmark: thread_notif_migrate\n");
+        rc = bench_thread_notif_migrate(&ctx);
     } else {
         fprintf(stderr, "Unknown benchmark: %s\n", b);
         rc = EINVAL;
