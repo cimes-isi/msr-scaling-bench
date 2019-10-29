@@ -40,7 +40,7 @@ void msr_free(struct msr_handle *m)
     free(m);
 }
 
-uint32_t msr_get_cpu(struct msr_handle *m)
+uint32_t msr_get_cpu(const struct msr_handle *m)
 {
     return m->cpu;
 }
@@ -69,7 +69,7 @@ int msr_close(struct msr_handle *m)
     return rc;
 }
 
-ssize_t msr_read(struct msr_handle *m, uint32_t msr, uint64_t* data)
+ssize_t msr_read(const struct msr_handle *m, uint32_t msr, uint64_t* data)
 {
     return pread(m->fd, data, sizeof(uint64_t), msr);
 }

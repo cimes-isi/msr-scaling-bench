@@ -12,12 +12,12 @@ struct msr_handle *msr_alloc(uint32_t cpu);
 
 void msr_free(struct msr_handle *m);
 
-uint32_t msr_get_cpu(struct msr_handle *m);
+uint32_t msr_get_cpu(const struct msr_handle *m);
 
 int msr_open(struct msr_handle *m);
 
 int msr_close(struct msr_handle *m);
 
-ssize_t msr_read(struct msr_handle *m, uint32_t msr, uint64_t* data);
+ssize_t msr_read(const struct msr_handle *m, uint32_t msr, uint64_t* data);
 
 #endif // MSR_H
