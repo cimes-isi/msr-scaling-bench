@@ -12,7 +12,7 @@
 #define BENCH_DEBUG 0
 #endif
 
-static int bench_rdmsrs(struct msr_handle *h, uint32_t *msrs, uint32_t n_msrs)
+static int bench_rdmsrs(const struct msr_handle *h, const uint32_t *msrs, uint32_t n_msrs)
 {
     uint64_t data;
     uint32_t m;
