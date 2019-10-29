@@ -55,21 +55,23 @@ int bench_serial_migrate(const struct bench *ctx)
     uint32_t g;
     uint32_t h;
     int err = 0;
+    affinity_save(&aff);
     for (i = 0; i < ctx->iters; i++) {
         for (g = 0; g < ctx->n_cpu_groups; g++) {
             for (h = 0; h < ctx->cpu_groups[g].n_handles; h++) {
-                affinity_save_and_set(&aff, msr_get_cpu(ctx->cpu_groups[g].handles[h]));
+                affinity_set_cpu(msr_get_cpu(ctx->cpu_groups[g].handles[h]));
                 if (bench_rdmsrs(ctx->cpu_groups[g].handles[h], ctx->msrs, ctx->n_msrs)) {
                     err = errno;
                 }
-                affinity_restore(&aff);
                 if (err) {
+                    affinity_restore(&aff);
                     errno = err;
                     return -1;
                 }
             }
         }
     }
+    affinity_restore(&aff);
     return 0;
 }
 
@@ -89,7 +91,7 @@ static void *bench_thr(void *arg)
 {
     struct bench_thr_ctx *btc = (struct bench_thr_ctx *)arg;
     const struct bench *ctx = btc->ctx;
-    struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
+    const struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
     uint32_t h;
     while (!btc->die) {
         // wait for go-ahead
@@ -110,18 +112,16 @@ static void *bench_thr_migrate(void *arg)
 {
     struct bench_thr_ctx *btc = (struct bench_thr_ctx *)arg;
     const struct bench *ctx = btc->ctx;
-    struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
-    struct affinity aff;
+    const struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
     uint32_t h;
     while (!btc->die) {
         // wait for go-ahead
         if (btc->go) {
             for (h = 0; h < group->n_handles; h++) {
-                affinity_save_and_set(&aff, msr_get_cpu(group->handles[h]));
+                affinity_set_cpu(msr_get_cpu(group->handles[h]));
                 if (bench_rdmsrs(group->handles[h], ctx->msrs, ctx->n_msrs)) {
                     btc->err = errno;
                 }
-                affinity_restore(&aff);
             }
             btc->go = 0;
         }
@@ -134,7 +134,7 @@ static void *bench_thr_notif(void *arg)
 {
     struct bench_thr_ctx *btc = (struct bench_thr_ctx *)arg;
     const struct bench *ctx = btc->ctx;
-    struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
+    const struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
     uint32_t h;
     pthread_mutex_lock(&btc->mtx);
     while (!btc->die) {
@@ -160,8 +160,7 @@ static void *bench_thr_notif_migrate(void *arg)
 {
     struct bench_thr_ctx *btc = (struct bench_thr_ctx *)arg;
     const struct bench *ctx = btc->ctx;
-    struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
-    struct affinity aff;
+    const struct bench_cpu_group *group = &ctx->cpu_groups[btc->cpu_group];
     uint32_t h;
     pthread_mutex_lock(&btc->mtx);
     while (!btc->die) {
@@ -173,11 +172,10 @@ static void *bench_thr_notif_migrate(void *arg)
             break;
         }
         for (h = 0; h < group->n_handles; h++) {
-            affinity_save_and_set(&aff, msr_get_cpu(group->handles[h]));
+            affinity_set_cpu(msr_get_cpu(group->handles[h]));
             if (bench_rdmsrs(group->handles[h], ctx->msrs, ctx->n_msrs)) {
                 btc->err = errno;
             }
-            affinity_restore(&aff);
         }
         btc->go = 0;
     }
