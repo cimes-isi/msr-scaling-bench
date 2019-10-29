@@ -25,8 +25,8 @@ The following benchmark variations are implemented:
 
 * `serial` - single threaded, without explicit `CPU` binding
 * `serial_migrate` - single threaded, with explicit `CPU` binding
-* `thread` - threaded by `CPUGroup`, without explicit `CPU` binding (threads poll for iteration go-ahead)
-* `thread_migrate` - threaded by `CPUGroup`, with explicit `CPU` binding (threads poll for iteration go-ahead)
+* `thread` - threaded by `CPUGroup`, without explicit `CPU` binding (threads poll and yield waiting for iteration go-ahead)
+* `thread_migrate` - threaded by `CPUGroup`, with explicit `CPU` binding (threads poll and yield waiting for iteration go-ahead)
 * `thread_notif` - threaded by `CPUGroup`, without explicit `CPU` binding (threads wait on conditional for iteration go-ahead)
 * `thread_notif_migrate` - threaded by `CPUGroup`, with explicit `CPU` binding (threads wait on conditional for iteration go-ahead)
 
