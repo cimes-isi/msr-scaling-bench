@@ -10,6 +10,6 @@ struct affinity {
 
 void affinity_save_and_set(struct affinity *aff, uint32_t cpu);
 
-void affinity_restore(struct affinity *aff);
+void affinity_restore(const struct affinity *aff);
 
 #endif // AFFINITY_H

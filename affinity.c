@@ -13,7 +13,7 @@ void affinity_save_and_set(struct affinity *aff, uint32_t cpu)
     pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &aff_new);
 }
 
-void affinity_restore(struct affinity *aff)
+void affinity_restore(const struct affinity *aff)
 {
     pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &aff->aff_orig);
 }
