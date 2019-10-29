@@ -19,10 +19,8 @@ static int bench_rdmsrs(struct msr_handle *h, uint32_t *msrs, uint32_t n_msrs)
 #if BENCH_DEBUG
     uint32_t cpu = msr_get_cpu(h);
 #endif
-    ssize_t rc = 0;
     for (m = 0; m < n_msrs; m++) {
-        rc = msr_read(h, msrs[m], &data);
-        if (rc < 0) {
+        if (msr_read(h, msrs[m], &data) < 0) {
             perror("msr_read");
             return -1;
         }
