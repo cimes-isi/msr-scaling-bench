@@ -10,7 +10,7 @@
 #include "msr.h"
 
 #ifndef CPU_GROUPS_MAX
-#define CPU_GROUPS_MAX 64
+#define CPU_GROUPS_MAX 4096
 #endif
 
 #ifndef CPUS_MAX
